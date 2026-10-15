@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBlock 2D - Petualangan EVE</title>
+    
+    <!-- Thumbnail Blogger Tersembunyi -->
+    <div style="display:none;">
+        <img src="https://i.imghippo.com/files/ruQo4840Y.png" alt="EduBlock 2D Thumbnail">
+    </div>
+
+    <!-- Library Eksternal -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Tailwind CSS untuk Desain Modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #3B82F6;
+            --secondary: #10B981;
+            --dark-bg: #09090b;
+            --panel-bg: rgba(24, 24, 27, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+
+        * { font-family: 'Poppins', sans-serif; }
+        .font-sci { font-family: 'Orbitron', sans-serif; }
+        
+        body { 
+            background-color: var(--dark-bg); 
+            background-image: radial-gradient(circle at 50% 0%, #1e1b4b, #000000);
+            color: white; 
+            overflow: hidden; 
+            height: 100vh;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+        .hidden-screen { display: none !important; }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Desain Blok Ala Scratch */
+        .scratch-block { 
+            padding: 8px 10px; 
+            margin-bottom: 8px; 
+            border-radius: 8px; 
+            color: white; 
+            font-weight: 600; 
+            cursor: pointer; 
+            box-shadow: 0 4px 0 rgba(0,0,0,0.3);
+            position: relative; 
+            user-select: none;
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            transition: transform 0.1s, filter 0.2s;
+            border-left: 4px solid rgba(255,255,255,0.3);
+            font-size: 0.75rem;
+        }
+        .scratch-block:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0.3); }
+        .scratch-block:hover { filter: brightness(1.15); }
+        
+        .block-move { background: linear-gradient(90deg, #2563EB, #3B82F6); }
+        .block-turn { background: linear-gradient(90deg, #059669, #10B981); }
+        .block-jump { background: linear-gradient(90deg, #0284c7, #38bdf8); }
+        .block-speak { background: linear-gradient(90deg, #7C3AED, #8B5CF6); }
+        .block-transform { background: linear-gradient(90deg, #D97706, #F59E0B); }
+        .block-shrink { background: linear-gradient(90deg, #9333ea, #c084fc); }
+        .block-color { background: linear-gradient(90deg, #BE123C, #E11D48); }
+        
+        .workspace .scratch-block { 
+            width: 100%; 
+            animation: slideIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        } 
+        .workspace .scratch-block::after {
+            content: "\f00d"; font-family: "Font Awesome 6 Free"; font-weight: 900;
+            position: absolute; right: 10px; color: rgba(255,255,255,0.3);
+        }
+        .workspace .scratch-block:hover::after { color: #FF4136; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-30px) scale(0.9); }
+            to { opacity: 1; transform: translateX(0) scale(1); }
+        }
+
+        .level-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .level-card:hover:not(.locked) { 
+            transform: translateY(-8px) scale(1.02); 
+            box-shadow: 0 15px 30px rgba(59, 130, 246, 0.3); 
+            border-color: var(--primary); 
+        }
+        .locked { opacity: 0.5; filter: grayscale(100%); cursor: not-allowed; }
+        
+        .glow-text { text-shadow: 0 0 10px rgba(59, 130, 246, 0.8); }
+
+        /* Peta Grid */
+        #map-grid {
+            background-image: 
+                linear-gradient(rgba(59, 130, 246, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59, 130, 246, 0.2) 1px, transparent 1px);
+            background-size: 60px 60px;
+            background-position: center;
+        }
+
+        .obstacle-cell {
+            position: absolute; width: 60px; height: 60px;
+            display: flex; justify-content: center; align-items: center; z-index: 10;
+        }
+        .anim-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+    </style>
+</head>
+<body class="antialiased relative">
+
+    <!-- TRADEMARK UMUM -->
+    <div class="fixed bottom-3 right-5 text-[10px] text-slate-500 font-sci tracking-widest z-[1000] drop-shadow-md pointer-events-none">
+        © 2026 ANDHI ASMARA HADI
+    </div>
+
+    <div id="app-container" class="w-full h-full relative">
+        
+        <!-- LOGIN SCREEN -->
+        <div id="login-screen" class="absolute inset-0 flex justify-center items-center z-50 bg-[url('https://images.unsplash.com/photo-1614729939124-032f0b56c9ce?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center">
+            <div class="absolute inset-0 bg-black/70 backdrop-blur-md"></div>
+            
+            <div class="glass-panel p-10 rounded-3xl w-[400px] z-10 text-center relative overflow-hidden border border-slate-700/50">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-emerald-400 to-purple-500"></div>
+                
+                <!-- Custom Logo -->
+                <div class="w-32 h-32 mx-auto mb-6 relative flex justify-center items-center">
+                    <div class="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-20 animate-pulse"></div>
+                    <img src="https://i.imghippo.com/files/ruQo4840Y.png" alt="Logo" class="w-full h-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+                </div>
+                
+                <h2 class="text-3xl font-sci font-bold mb-2 tracking-widest glow-text">EDU<span class="text-blue-400">BLOCK</span></h2>
+                <p class="text-slate-400 text-sm mb-8 font-light">Sistem Simulasi Logika 25 Sektor</p>
+                
+                <div class="space-y-4">
+                    <div class="relative group">
+                        <i class="fa-solid fa-user-astronaut absolute left-4 top-3.5 text-slate-500 group-focus-within:text-blue-400 transition-colors"></i>
+                        <input type="text" id="login-username" placeholder="Username / NISN" class="w-full bg-slate-900/80 border border-slate-700 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:border-blue-500 transition-colors text-sm shadow-inner">
+                    </div>
+                    <div class="relative group">
+                        <i class="fa-solid fa-lock absolute left-4 top-3.5 text-slate-500 group-focus-within:text-blue-400 transition-colors"></i>
+                        <input type="password" id="login-password" placeholder="Password" class="w-full bg-slate-900/80 border border-slate-700 text-white rounded-xl py-3 pl-12 pr-4 focus:outline-none focus:border-blue-500 transition-colors text-sm shadow-inner">
+                    </div>
+                    
+                    <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.5)] transform transition active:scale-95 text-sm tracking-wider mt-2">
+                        INISIALISASI SISTEM
+                    </button>
+                </div>
+                
+                <p id="login-error" class="text-red-400 mt-4 text-xs hidden bg-red-900/30 border border-red-500/30 p-2 rounded-lg"><i class="fa-solid fa-triangle-exclamation"></i> <span id="login-error-text">Kredensial tidak valid atau data belum terdaftar.</span></p>
+                
+                <div class="mt-8 pt-4 border-t border-slate-800 text-[11px] text-slate-500 text-left bg-slate-900/50 p-3 rounded-lg">
+                    <p class="mb-1 font-semibold text-slate-400">Akun Uji Coba Default:</p>
+                    <div class="flex justify-between mb-1">
+                        <span>Admin: <span class="text-blue-400">admin</span></span>
+                        <span>Pass: <span class="text-emerald-400">edudigital</span></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Siswa: <span class="text-blue-400">peserta</span></span>
+                        <span>Pass: <span class="text-emerald-400">edudigital</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN SCREEN -->
+        <div id="admin-screen" class="hidden-screen w-full h-full p-8 overflow-y-auto">
+            <div class="max-w-7xl mx-auto pb-10">
+                <div class="glass-panel rounded-2xl p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/30 overflow-hidden relative p-1 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                            <img src="https://i.imghippo.com/files/TGnF2867NaI.png" alt="Admin Logo" class="w-full h-full object-contain relative z-10">
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold font-sci text-white">Mainframe Guru <span class="text-xs text-emerald-400 animate-pulse ml-2" id="sync-status">(Sinkronisasi Aktif)</span></h2>
+                            <p class="text-slate-400 text-sm">Pusat kelola data, rekap nilai, dan kontrol akses.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="downloadTemplate()" class="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm transition tooltip" title="Unduh format untuk upload massal"><i class="fa-solid fa-file-excel mr-2 text-emerald-400"></i>Template</button>
+                        <label class="bg-blue-600/20 border border-blue-500/50 hover:bg-blue-600/40 text-blue-300 px-4 py-2 rounded-lg text-sm transition cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up mr-2"></i>Upload Data
+                            <input type="file" id="upload-excel" accept=".xlsx, .xls" class="hidden" onchange="handleBulkUpload(event)">
+                        </label>
+                        <button onclick="deleteAllData()" class="bg-red-500/20 border border-red-500/50 hover:bg-red-500/40 text-red-400 px-4 py-2 rounded-lg text-sm transition"><i class="fa-solid fa-trash mr-2"></i>Hapus Semua Data</button>
+                        <button onclick="changeAdminPassword()" class="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm transition"><i class="fa-solid fa-key mr-2 text-blue-400"></i>Ganti Password</button>
+                        <button onclick="logout()" class="bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm transition"><i class="fa-solid fa-power-off mr-2"></i>Keluar</button>
+                    </div>
+                </div>
+
+                <!-- Panel Laporan -->
+                <div class="glass-panel rounded-2xl p-6 border border-slate-700/50 mb-6">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-700/50 pb-4">
+                        <h3 class="text-lg font-bold font-sci text-blue-400"><i class="fa-solid fa-chart-line mr-2"></i>Laporan Performa</h3>
+                        
+                        <div class="flex flex-wrap items-center gap-3">
+                            <select id="class-filter" onchange="renderAdminTable()" class="bg-slate-900 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="all">Semua Kelas</option>
+                            </select>
+                            
+                            <div class="flex border border-slate-700 rounded-lg overflow-hidden">
+                                <button onclick="exportData('excel')" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold transition text-emerald-400 border-r border-slate-700" title="Download Excel"><i class="fa-solid fa-file-excel mr-1"></i> EXCEL</button>
+                                <button onclick="exportData('pdf')" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold transition text-red-400 border-r border-slate-700" title="Download PDF"><i class="fa-solid fa-file-pdf mr-1"></i> PDF</button>
+                                <button onclick="exportData('image')" class="bg-slate-800 hover:bg-slate-700 px-4 py-2 text-xs font-bold transition text-blue-400" title="Download Gambar"><i class="fa-solid fa-image mr-1"></i> GAMBAR</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm" id="report-table">
+                            <thead>
+                                <tr class="border-b border-slate-700 text-slate-400 bg-slate-900/80">
+                                    <th class="py-3 px-4 font-medium rounded-tl-lg">ID / NISN</th>
+                                    <th class="py-3 px-4 font-medium">Nama Kadet</th>
+                                    <th class="py-3 px-4 font-medium">Kelas</th>
+                                    <th class="py-3 px-4 font-medium">Progress Level (Maks 25)</th>
+                                    <th class="py-3 px-4 font-medium">Total XP</th>
+                                    <th class="py-3 px-4 font-medium rounded-tr-lg text-center" data-html2canvas-ignore>Manajemen Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-table-body" class="text-slate-200">
+                                <!-- Data inject -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HTML Tersembunyi untuk Export Image/PDF yang Bersih -->
+        <div id="export-container" class="fixed -left-[9999px] top-0 bg-white p-8 text-black" style="width: 1000px;">
+            <div class="mb-6 flex justify-between items-center border-b-2 border-black pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold font-sci">Laporan EduBlock 2D</h2>
+                    <p class="text-gray-600 text-sm">© 2026 ANDHI ASMARA HADI</p>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold">Kelas: <span id="export-class-label">Semua</span></p>
+                    <p class="text-sm">Tanggal: <span id="export-date"></span></p>
+                </div>
+            </div>
+            <table class="w-full text-left border-collapse text-sm border border-gray-300">
+                <thead>
+                    <tr class="bg-gray-100 border-b-2 border-gray-400">
+                        <th class="py-2 px-3 border border-gray-300">NISN</th>
+                        <th class="py-2 px-3 border border-gray-300">Nama</th>
+                        <th class="py-2 px-3 border border-gray-300">Kelas</th>
+                        <th class="py-2 px-3 border border-gray-300">Level Terakhir</th>
+                        <th class="py-2 px-3 border border-gray-300">Total Skor (XP)</th>
+                    </tr>
+                </thead>
+                <tbody id="export-table-body">
+                    <!-- Export Data Inject -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- STUDENT DASHBOARD (MAP) -->
+        <div id="student-screen" class="hidden-screen w-full h-full p-8 overflow-y-auto relative">
+            <div class="max-w-7xl mx-auto pb-10">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-10 glass-panel p-4 rounded-2xl border border-blue-500/20 gap-4">
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <div class="absolute inset-0 bg-blue-500 rounded-full blur opacity-50"></div>
+                            <img src="https://api.dicebear.com/7.x/bottts/svg?seed=EVE&backgroundColor=1e293b" class="w-14 h-14 rounded-full border-2 border-blue-400 relative z-10 bg-slate-800" alt="Avatar">
+                        </div>
+                        <div>
+                            <p class="text-blue-300 text-xs font-bold uppercase tracking-widest mb-1">Kadet Aktif</p>
+                            <h2 class="text-xl font-bold font-sci tracking-wide" id="student-name-display">Nama Siswa</h2>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-6">
+                        <div class="text-right">
+                            <p class="text-slate-400 text-xs font-semibold uppercase mb-1">Total Energi Terkumpul</p>
+                            <p class="text-yellow-400 font-bold font-sci text-xl glow-text" id="student-xp-display"><i class="fa-solid fa-bolt mr-1"></i>0 XP</p>
+                        </div>
+                        <button onclick="logout()" class="w-10 h-10 rounded-full bg-slate-800 hover:bg-red-500/20 border border-slate-600 hover:border-red-500 text-slate-400 hover:text-red-400 transition flex justify-center items-center tooltip" title="Keluar">
+                            <i class="fa-solid fa-power-off"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <h1 class="text-3xl font-sci font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">PETA 25 SEKTOR NAVIGASI</h1>
+                    <p class="text-slate-400 text-sm border-l-2 border-blue-500 pl-3">Analisis lingkungan secara visual dan rangkai blok logikamu untuk beradaptasi dengan semua rintangan.</p>
+                </div>
+                
+                <!-- Banner Kemenangan (Akan muncul jika tamat level 25) -->
+                <div id="victory-banner-container"></div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" id="level-grid">
+                    <!-- Levels inject -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME SCREEN -->
+        <div id="game-screen" class="hidden-screen w-full h-full flex flex-col bg-black">
+            <!-- Header Game -->
+            <div class="h-16 glass-panel border-b border-slate-800 flex items-center justify-between px-4 md:px-6 z-20 flex-shrink-0">
+                <button onclick="backToMap()" class="text-slate-400 hover:text-white transition flex items-center gap-2 text-[10px] md:text-sm font-semibold bg-slate-800/50 hover:bg-slate-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg border border-slate-700">
+                    <i class="fa-solid fa-arrow-left"></i> Tinggalkan
+                </button>
+                <div class="flex items-center gap-4 md:gap-6">
+                    <div class="flex items-center gap-2 md:gap-3">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                        <h3 id="game-level-title" class="text-sm md:text-lg font-bold font-sci text-white tracking-widest">Sektor 1</h3>
+                    </div>
+                    <div class="flex items-center gap-2 bg-red-900/20 px-3 py-1 rounded-full border border-red-500/30">
+                        <i class="fa-solid fa-heart-pulse text-red-500 text-xs md:text-sm"></i>
+                        <span id="ui-lives" class="font-bold text-xs md:text-sm tracking-widest text-red-400 font-sci mt-0.5">3</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative pb-8 md:pb-0">
+                
+                <!-- Panel Peta (Order-1 HP, Order-2 Desktop) -->
+                <div class="w-full md:flex-1 relative bg-[#09090b] flex items-center justify-center overflow-hidden min-h-[350px] md:min-h-0 py-6 md:py-0 flex-none border-b md:border-b-0 md:border-l border-slate-800 order-1 md:order-2 z-0">
+                    <div id="map-grid" class="relative w-[300px] h-[300px] border-2 border-blue-800 rounded-lg shadow-[0_0_50px_rgba(37,99,235,0.15)] bg-slate-900/60 flex-shrink-0">
+                        <div id="obstacles-container"></div>
+                        <div id="battery-target" class="absolute w-[60px] h-[60px] flex justify-center items-center z-10 transition-all duration-500">
+                            <div class="relative flex justify-center items-center">
+                                <div id="battery-glow" class="absolute inset-0 bg-emerald-500 blur-md opacity-40 rounded-full animate-ping"></div>
+                                <i id="battery-icon" class="fa-solid fa-battery-full text-3xl text-emerald-400 relative z-10 transition-transform duration-300"></i>
+                            </div>
+                        </div>
+                        <div id="eve-robot" class="absolute w-[60px] h-[60px] flex justify-center items-center z-20">
+                            <div class="relative w-[50px] h-[50px] flex justify-center items-center">
+                                <img src="https://api.dicebear.com/7.x/bottts/svg?seed=EVE&backgroundColor=transparent" class="w-full h-full relative z-10 drop-shadow-[0_0_10px_rgba(59,130,246,0.6)]" id="eve-img">
+                                <div id="eve-red-eye" class="absolute top-[35%] left-[25%] w-[50%] h-[20%] bg-red-500 blur-[2px] rounded-full opacity-0 transition-opacity duration-300 z-20"></div>
+                            </div>
+                        </div>
+                        <div id="speak-bubble" class="absolute bg-white text-slate-900 font-bold px-4 py-1.5 rounded-xl shadow-lg transform scale-0 transition-transform duration-300 origin-bottom-left text-xs border border-blue-200 z-30 whitespace-nowrap -top-8 -right-8">
+                            "Sandi Terkirim!"
+                            <div class="absolute -bottom-1.5 left-4 w-3 h-3 bg-white rotate-45 border-r border-b border-blue-200"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Panel Workspace Kode (Order-2 HP, Order-1 Desktop) -->
+                <div class="w-full md:w-[450px] flex flex-col glass-panel z-10 shadow-[10px_0_30px_rgba(0,0,0,0.8)] relative flex-none h-auto min-h-[450px] md:h-full order-2 md:order-1">
+                    
+                    <!-- PERBAIKAN: Tombol Eksekusi Dipindah Ke Sini -->
+                    <div class="p-3 md:p-4 bg-blue-900/10 border-b border-blue-500/20 flex-shrink-0 flex justify-between items-center gap-2 md:gap-4">
+                        <div class="flex items-start gap-2 md:gap-3 flex-1 overflow-hidden">
+                            <i class="fa-solid fa-satellite-dish text-blue-400 mt-1 animate-pulse"></i>
+                            <div>
+                                <h4 class="text-[10px] text-blue-300 font-bold mb-1 uppercase tracking-widest">Briefing Misi:</h4>
+                                <p id="game-case-desc" class="text-xs md:text-sm text-slate-300 leading-snug font-light line-clamp-2">Panduan misi.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2 flex-shrink-0">
+                            <button onclick="clearWorkspace()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white p-2 md:p-2.5 rounded-lg flex-none transition tooltip" title="Hapus Semua">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                            <button onclick="runCode()" id="btn-run" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 md:py-2.5 px-3 md:px-4 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.4)] flex items-center justify-center gap-2 transition transform active:scale-95 text-xs md:text-sm font-sci tracking-wider whitespace-nowrap">
+                                <i class="fa-solid fa-play"></i> EKSEKUSI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Layout Berdampingan (Kiri: Perintah, Kanan: Logika) -->
+                    <div class="flex flex-1 flex-row overflow-hidden bg-slate-950/50">
+                        
+                        <!-- Kolom Kiri: Modul Perintah -->
+                        <div class="w-1/2 p-3 bg-slate-900/80 border-r border-slate-800 overflow-y-auto pb-10">
+                            <h4 class="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-widest font-sci text-center">Modul Perintah</h4>
+                            <div class="flex flex-col gap-1.5">
+                                <div class="scratch-block block-move" onclick="addBlock('forward')"><i class="fa-solid fa-arrow-up"></i> Maju</div>
+                                <div class="scratch-block block-jump" onclick="addBlock('jump')"><i class="fa-solid fa-angle-double-up"></i> Lompat</div>
+                                <div class="scratch-block block-turn" onclick="addBlock('right')"><i class="fa-solid fa-turn-up rotate-90"></i> Kanan</div>
+                                <div class="scratch-block block-turn" onclick="addBlock('left')"><i class="fa-solid fa-turn-up -rotate-90"></i> Kiri</div>
+                                <div class="scratch-block block-speak" onclick="addBlock('speak')"><i class="fa-solid fa-comment-dots"></i> Bicara</div>
+                                <div class="scratch-block block-transform" onclick="addBlock('grow')"><i class="fa-solid fa-expand"></i> Perbesar</div>
+                                <div class="scratch-block block-shrink" onclick="addBlock('shrink')"><i class="fa-solid fa-compress"></i> Perkecil</div>
+                                <div class="scratch-block block-color" onclick="addBlock('color')"><i class="fa-solid fa-eye"></i> Mata Merah</div>
+                            </div>
+                        </div>
+
+                        <!-- Kolom Kanan: Sekuens Logika Aktif -->
+                        <div class="w-1/2 p-3 overflow-y-auto relative workspace-container pb-10" id="workspace-container">
+                            <h4 class="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-widest font-sci text-center">Sekuens Logika</h4>
+                            <div id="workspace" class="min-h-[150px] pb-10 flex flex-col workspace"></div>
+                            <div id="workspace-placeholder" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center w-full pointer-events-none opacity-50 px-2">
+                                <i class="fa-solid fa-microchip text-3xl text-slate-700 mb-2"></i>
+                                <p class="text-slate-500 text-[10px] font-light leading-tight">Klik modul di kiri untuk menyusun algoritma.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL NOTIFIKASI -->
+        <div id="custom-modal" class="hidden-screen absolute inset-0 bg-black/80 backdrop-blur-md z-[9999] flex justify-center items-center opacity-0 transition-opacity duration-300">
+            <div class="glass-panel p-8 rounded-3xl w-[90%] max-w-sm text-center transform scale-90 transition-transform duration-300 border border-slate-700" id="modal-box">
+                <div id="modal-icon" class="text-6xl mb-6 relative"></div>
+                <h2 id="modal-title" class="text-2xl font-bold font-sci tracking-wide mb-3 text-white">Status!</h2>
+                <p id="modal-desc" class="text-slate-300 mb-8 text-sm leading-relaxed">Deskripsi pesan.</p>
+                <button id="modal-btn" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl transition text-sm font-sci tracking-widest">
+                    KONFIRMASI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // KONFIGURASI APLIKASI
+        // UBAH IS_PREVIEW KE false JIKA AKAN DI-DEPLOY KE BLOGGER
+        const IS_PREVIEW = false; 
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxiVF7sAddSH532hp1SK4cXwbOdZS9KUcJN9kzewzHXRc0pNAMWILT1GNoofRH7lVRl/exec";
+
+        // ==========================================
+        // 1. DATA KADET & KONFIGURASI 25 LEVEL 
+        // ==========================================
+        let adminCreds = { user: 'admin', pass: 'edudigital' };
+        let currentUser = null;
+        let currentLevel = null;
+        let lives = 3;
+        let isAnimating = false;
+        let adminRefreshInterval = null; 
+        
+        let dummySiswa = [
+            { nisn: 'peserta', nama: 'Kadet Demo', kelas: '7A', password: 'edudigital', currentLevel: 1, totalSkor: 0 },
+            { nisn: '081234', nama: 'Astro Beta', kelas: '7B', password: '123', currentLevel: 5, totalSkor: 450 }
+        ];
+
+        // Engine State 2D
+        let robotX = 0, robotZ = 0; 
+        let robotFacing = 0; // 0:Up, 1:Right, 2:Down, 3:Left
+        let robotRotDeg = 0;
+        let eState = { shrunk: false, grown: false, redEye: false, spoke: false };
+        const C_SIZE = 60; 
+
+        function buildWall(axis, value, exceptions = []) {
+            let rocks = [];
+            for(let i = -2; i <= 2; i++) {
+                if(!exceptions.includes(i)) {
+                    if(axis === 'x') rocks.push({x: value, z: i, type: 'rock'});
+                    else rocks.push({x: i, z: value, type: 'rock'});
+                }
+            }
+            return rocks;
+        }
+
+        const levelConfigs = [
+            { level: 1, title: "Inisiasi Dasar", desc: "Baterai terdeteksi di lurus di depan. Dekati dan ambil.", 
+              startZ: 1, targetZ: -1, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1)] },
+            { level: 2, title: "Belokan Pertama", desc: "Ada batu menghalangi. Cari rute memutar ke kanan.", 
+              startZ: 2, targetZ: 0, startX: 0, targetX: 2, reqGrow: false, obstacles: [{x:0, z:1, type:'rock'}, {x:0, z:0, type:'rock'}, ...buildWall('x', -1), {x:1, z:-1, type:'rock'}, {x:2, z:-1, type:'rock'}] },
+            { level: 3, title: "Gerbang Sandi", desc: "Kirim sandi suara sebelum melintasi laser.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:0, type:'laser'}] },
+            { level: 4, title: "Zona Radiasi", desc: "Aktifkan Mode Mata Merah untuk bertahan di radiasi.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:-1, type:'radiation'}] },
+            { level: 5, title: "Kapasitas Maksimal", desc: "Baterai Super! Perbesar dirimu sebelum mengambilnya.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: true, obstacles: [...buildWall('x', -1), ...buildWall('x', 1)] },
+            { level: 6, title: "Barikade Total", desc: "Temukan rute zig-zag melalui celah sempit.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [{x:0, z:0, type:'rock'}, {x:-1, z:0, type:'rock'}, {x:-2, z:0, type:'rock'}, {x:-2, z:1, type:'rock'}, {x:2, z:0, type:'rock'}, {x:2, z:-1, type:'rock'}] }, 
+            { level: 7, title: "Jurang Kematian", desc: "Lompati patahan lantai yang membentuk jurang.", 
+              startZ: 2, targetZ: -1, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'pit'}] },
+            { level: 8, title: "Lorong Sempit", desc: "Kamu harus menyusutkan diri melewati jembatan.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:0, type:'tunnel'}] },
+            { level: 9, title: "Distorsi Bentuk", desc: "JANGAN memperbesar diri saat masih di lorong.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: true, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'tunnel'}, {x:0, z:0, type:'rock', exceptions:[0]}] },
+            { level: 10, title: "Labirin Laser Ekstrem", desc: "Gunakan manuver berbelok, kirim sandi, dan bertahan.", 
+              startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: false, obstacles: [...buildWall('z', 0, [0]), ...buildWall('x', 1, [0, -1, -2]), ...buildWall('x', -1, [2, 1, 0]), {x:0, z:0, type:'laser'}, {x:-2, z:1, type:'pit'}, {x:2, z:-1, type:'pit'}] },
+            { level: 11, title: "Sungai Jurang", desc: "Hitung jarak lompatan melewati dua baris jurang.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'pit'}, {x:0, z:-1, type:'pit'}] },
+            { level: 12, title: "Gang Sempit Radiasi", desc: "Menyusut, melewati radiasi, berbelok di ruang sempit.", 
+              startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: false, obstacles: [...buildWall('z', 0, [0, -1]), ...buildWall('x', 0, [2, 1, 0]), {x:-1, z:0, type:'tunnel'}, {x:0, z:-1, type:'radiation'}] },
+            { level: 13, title: "Lompatan Buta", desc: "Melompat sembarangan akan mendarat di radiasi!", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'pit'}, {x:0, z:-1, type:'pit'}, {x:0, z:0, type:'radiation'}] },
+            { level: 14, title: "Ular Sektor", desc: "Telusuri pinggiran dinding membentuk pola huruf S.", 
+              startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: false, obstacles: [...buildWall('z', 1, [2]), ...buildWall('z', -1, [-2])] },
+            { level: 15, title: "Ujian Tiga Tahap", desc: "Lorong sempit, radiasi, laser. Modifikasi status fisik.", 
+              startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'tunnel'}, {x:0, z:0, type:'radiation'}, {x:0, z:-1, type:'laser'}] }
+        ];
+
+        // PERBAIKAN: Sektor 16-25 dengan variasi rintangan yang jauh lebih menantang
+        levelConfigs.push({ level: 16, title: "Z-Wall", desc: "Lewati terowongan sempit, lompati jurang dan tahan radiasi.", 
+            startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: false, obstacles: [...buildWall('z', 1, [-2]), ...buildWall('z', -1, [2]), {x:-2, z:1, type:'tunnel'}, {x:0, z:0, type:'pit'}, {x:2, z:-1, type:'radiation'}] });
+        
+        levelConfigs.push({ level: 17, title: "Tembok Ganda", desc: "Tahan serangan radiasi di awal, buka gerbang laser di akhir.", 
+            startZ: 2, targetZ: -2, startX: 2, targetX: -2, reqGrow: true, obstacles: [...buildWall('z', 1, [2, 1]), ...buildWall('z', -1, [-2, -1]), {x:2, z:1, type:'radiation'}, {x:1, z:1, type:'radiation'}, {x:-2, z:-1, type:'laser'}, {x:-1, z:-1, type:'laser'}] });
+        
+        levelConfigs.push({ level: 18, title: "Zig-Zag Udara", desc: "Lompati susunan jurang yang berliku, perbesar tubuh di akhir.", 
+            startZ: 2, targetZ: -2, startX: -1, targetX: 1, reqGrow: true, obstacles: [...buildWall('x', -2), ...buildWall('x', 2), {x:-1, z:1, type:'pit'}, {x:1, z:0, type:'pit'}, {x:-1, z:-1, type:'pit'}, {x:0, z:1, type:'rock'}, {x:0, z:-1, type:'rock'}] });
+        
+        levelConfigs.push({ level: 19, title: "Ruang Cermin", desc: "Menyelip melalui terowongan ganda dan hindari laser di tengah.", 
+            startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1, [1, -1]), ...buildWall('x', 1, [1, -1]), {x:-1, z:1, type:'tunnel'}, {x:1, z:-1, type:'tunnel'}, {x:0, z:0, type:'laser'}] });
+
+        levelConfigs.push({ level: 20, title: "Ujian Tiga Lapis", desc: "Melewati radiasi, melompati jurang, dan menyusut di garis akhir.", 
+            startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: false, obstacles: [...buildWall('z', 1, [-2]), ...buildWall('z', 0, [0]), ...buildWall('z', -1, [2]), {x:-2, z:1, type:'radiation'}, {x:0, z:0, type:'pit'}, {x:2, z:-1, type:'tunnel'}] });
+
+        levelConfigs.push({ level: 21, title: "Lompatan Iman", desc: "Lompati jurang, waspada mendarat di area radiasi.", 
+            startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -1), ...buildWall('x', 1), {x:0, z:1, type:'pit'}, {x:0, z:0, type:'radiation'}, {x:0, z:-1, type:'pit'}] });
+
+        levelConfigs.push({ level: 22, title: "Jalur Hitam", desc: "Cari rute memutar terowongan dan laser yang bersilangan.", 
+            startZ: 2, targetZ: -2, startX: 2, targetX: -2, reqGrow: false, obstacles: [...buildWall('z', 0, [2, -2]), {x:2, z:0, type:'tunnel'}, {x:-2, z:0, type:'tunnel'}, {x:0, z:1, type:'rock'}, {x:0, z:-1, type:'rock'}, {x:1, z:-1, type:'laser'}, {x:-1, z:1, type:'laser'}] });
+
+        levelConfigs.push({ level: 23, title: "Bunker", desc: "Akses laser ganda dengan radiasi mematikan di pusat.", 
+            startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: false, obstacles: [...buildWall('x', -2), ...buildWall('x', 2), {x:-1, z:1, type:'laser'}, {x:1, z:1, type:'laser'}, {x:0, z:0, type:'radiation'}, {x:-1, z:-1, type:'laser'}, {x:1, z:-1, type:'laser'}] });
+
+        levelConfigs.push({ level: 24, title: "Kombinasi Ekstrem", desc: "Menyusut, lompati jurang, dan sandi laser secara berurutan.", 
+            startZ: 2, targetZ: -2, startX: -2, targetX: 2, reqGrow: true, obstacles: [...buildWall('z', 1, [-2]), ...buildWall('z', 0, [-2]), ...buildWall('z', -1, [2]), {x:-2, z:1, type:'tunnel'}, {x:-2, z:0, type:'pit'}, {x:2, z:-1, type:'laser'}, {x:0, z:0, type:'rock'}] });
+
+        levelConfigs.push({ level: 25, title: "INTI UTAMA", desc: "Tunjukkan keahlianmu. Kombinasi pamungkas untuk menjadi Master!", 
+            startZ: 2, targetZ: -2, startX: 0, targetX: 0, reqGrow: true, obstacles: [{x:0, z:1, type:'tunnel'}, {x:0, z:0, type:'pit'}, {x:0, z:-1, type:'laser'}, ...buildWall('x', -1), ...buildWall('x', 1), {x:-1, z:0, type:'radiation'}, {x:1, z:0, type:'radiation'}] });
+
+        // ==========================================
+        // 2. FUNGSI AUTENTIKASI & MANAJEMEN ADMIN
+        // ==========================================
+        function showScreen(id) {
+            ['login-screen', 'admin-screen', 'student-screen', 'game-screen'].forEach(s => {
+                document.getElementById(s).classList.add('hidden-screen');
+                document.getElementById(s).classList.remove('flex');
+            });
+            document.getElementById(id).classList.remove('hidden-screen');
+            if(id === 'login-screen' || id === 'game-screen') document.getElementById(id).classList.add('flex');
+
+            // Pengaturan Polling Admin (Auto Refresh)
+            if(id === 'admin-screen') {
+                if(!adminRefreshInterval && !IS_PREVIEW) {
+                    adminRefreshInterval = setInterval(async () => {
+                        const res = await fetchGAS({ action: 'get_all' }, true);
+                        if(res && res.success) {
+                            dummySiswa = res.data;
+                            renderAdminTable();
+                        }
+                    }, 15000); 
+                }
+            } else {
+                if(adminRefreshInterval) {
+                    clearInterval(adminRefreshInterval);
+                    adminRefreshInterval = null;
+                }
+            }
+        }
+
+        async function fetchGAS(payload, silent = false) {
+            if (IS_PREVIEW) return null;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            try {
+                const res = await fetch(GAS_URL, {
+                    method: 'POST', body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId); 
+                return await res.json();
+            } catch (e) {
+                clearTimeout(timeoutId);
+                if(!silent) console.error("GAS Error:", e);
+                let msg = e.name === 'AbortError' ? 'Server terlalu lama merespons.' : e.message;
+                return { success: false, error: msg };
+            }
+        }
+
+        async function handleLogin() {
+            const user = document.getElementById('login-username').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+            const errEl = document.getElementById('login-error');
+            const errText = document.getElementById('login-error-text');
+            const btn = document.querySelector('#login-screen button');
+            
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> MEMPROSES...';
+            btn.classList.add('opacity-50', 'pointer-events-none');
+            errEl.classList.add('hidden');
+            
+            try {
+                if (!IS_PREVIEW) {
+                    const res = await fetchGAS({ action: 'login', nisn: user, password: pass });
+                    if (res && res.success) {
+                        currentUser = res;
+                        if (res.role === 'admin') {
+                            adminCreds.pass = res.password; 
+                            await loadAdminData();
+                            showScreen('admin-screen');
+                        } else {
+                            document.getElementById('student-name-display').innerText = currentUser.nama;
+                            renderLevelMap();
+                            showScreen('student-screen');
+                        }
+                    } else {
+                        errEl.classList.remove('hidden');
+                        errText.innerText = res && res.error ? `Error: ${res.error}` : `Kredensial tidak valid.`;
+                    }
+                } else {
+                    if(user === adminCreds.user && pass === adminCreds.pass) {
+                        currentUser = { role: 'admin' };
+                        updateClassFilter(); renderAdminTable(); showScreen('admin-screen');
+                    } else {
+                        let siswa = dummySiswa.find(s => String(s.nisn) === String(user) && String(s.password) === String(pass));
+                        if(siswa) {
+                            currentUser = siswa; currentUser.role = 'siswa';
+                            document.getElementById('student-name-display').innerText = currentUser.nama;
+                            renderLevelMap(); showScreen('student-screen');
+                        } else {
+                            errEl.classList.remove('hidden'); errText.innerText = `Kredensial tidak valid.`;
+                        }
+                    }
+                }
+            } catch (error) {
+                errEl.classList.remove('hidden'); errText.innerText = `Sistem Error: ${error.message}`;
+            } finally {
+                btn.innerHTML = 'INISIALISASI SISTEM'; btn.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        }
+
+        async function loadAdminData() {
+            if(!IS_PREVIEW) {
+                const res = await fetchGAS({ action: 'get_all' });
+                if(res && res.success) dummySiswa = res.data;
+            }
+            updateClassFilter(); renderAdminTable();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('login-username').value = ''; document.getElementById('login-password').value = '';
+            showScreen('login-screen');
+        }
+
+        function updateClassFilter() {
+            const select = document.getElementById('class-filter');
+            select.innerHTML = '<option value="all">Semua Kelas</option>';
+            [...new Set(dummySiswa.map(s => s.kelas))].forEach(c => {
+                if(c && c !== '-') select.innerHTML += `<option value="${c}">Kelas ${c}</option>`;
+            });
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+            const filterClass = document.getElementById('class-filter').value;
+            let displayedData = filterClass === 'all' ? dummySiswa : dummySiswa.filter(s => s.kelas === filterClass);
+            
+            displayedData.forEach(s => {
+                let lvlDisplay = s.currentLevel > 25 ? 25 : s.currentLevel;
+                tbody.innerHTML += `
+                <tr class="border-b border-slate-700/50 hover:bg-slate-800/50 transition">
+                    <td class="py-3 px-4 font-mono text-blue-300 text-xs">${s.nisn}</td>
+                    <td class="py-3 px-4 font-semibold">${s.nama}</td>
+                    <td class="py-3 px-4"><span class="bg-slate-800 border border-slate-600 px-2 py-1 rounded text-xs">${s.kelas}</span></td>
+                    <td class="py-3 px-4">
+                        <div class="flex items-center gap-2">
+                            <div class="w-24 bg-slate-800 rounded-full h-1.5"><div class="bg-gradient-to-r from-blue-500 to-emerald-400 h-1.5 rounded-full" style="width: ${(lvlDisplay/25)*100}%"></div></div>
+                            <span class="text-[10px] text-slate-400 font-sci">LVL ${lvlDisplay}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-yellow-400 font-bold font-sci">${s.totalSkor}</td>
+                    <td class="py-3 px-4 text-center data-ignore">
+                        <button onclick="changePassword('${s.nisn}')" class="bg-slate-800 border border-slate-600 hover:bg-blue-600/30 hover:border-blue-500 text-blue-400 p-2 rounded-lg text-xs transition mr-1"><i class="fa-solid fa-key"></i></button>
+                        <button onclick="deleteStudent('${s.nisn}')" class="bg-slate-800 border border-slate-600 hover:bg-red-600/30 hover:border-red-500 text-red-400 p-2 rounded-lg text-xs transition"><i class="fa-solid fa-trash-can"></i></button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        async function changePassword(nisn) {
+            const siswa = dummySiswa.find(s => s.nisn === nisn);
+            if(!siswa) return;
+            const newPass = prompt(`Password baru untuk kadet ${siswa.nama}:`, siswa.password);
+            if(newPass) {
+                siswa.password = newPass.trim();
+                if(!IS_PREVIEW) await fetchGAS({ action: 'update_password', nisn: nisn, newPassword: siswa.password });
+                alert(`Password diubah!`);
+            }
+        }
+        
+        async function changeAdminPassword() {
+            const newPass = prompt(`Password baru untuk Admin:`, adminCreds.pass);
+            if(newPass) {
+                adminCreds.pass = newPass.trim();
+                if(!IS_PREVIEW) await fetchGAS({ action: 'update_password', nisn: 'admin', newPassword: adminCreds.pass });
+                alert(`Password Admin diperbarui!`);
+            }
+        }
+
+        async function deleteStudent(nisn) {
+            if(confirm(`Yakin menghapus permanen NISN ${nisn}?`)) {
+                dummySiswa = dummySiswa.filter(s => s.nisn !== nisn);
+                if(!IS_PREVIEW) await fetchGAS({ action: 'delete_student', nisn: nisn });
+                updateClassFilter(); renderAdminTable();
+            }
+        }
+
+        async function deleteAllData() {
+            if(confirm(`BAHAYA: Yakin MENGHAPUS SEMUA DATA?`)) {
+                if(!IS_PREVIEW) { await fetchGAS({ action: 'delete_all_students' }); await loadAdminData(); } 
+                else { dummySiswa.length = 0; updateClassFilter(); renderAdminTable(); }
+                alert("Data dibersihkan.");
+            }
+        }
+
+        async function handleBulkUpload(e) {
+            try {
+                const file = e.target.files[0]; if(!file) return;
+                const reader = new FileReader();
+                reader.onload = async function(evt) {
+                    const ws = XLSX.read(evt.target.result, {type: 'binary'}).Sheets[XLSX.read(evt.target.result, {type: 'binary'}).SheetNames[0]];
+                    const json = XLSX.utils.sheet_to_json(ws, { raw: false, defval: "" });
+                    let count = 0, newStudents = [];
+                    json.forEach(row => {
+                        let strNisn = String(row.NISN).trim();
+                        if(strNisn && row.Nama && row.Password) {
+                            newStudents.push({ nisn: strNisn, nama: String(row.Nama), kelas: String(row.Kelas || '-'), password: String(row.Password) });
+                            const exists = dummySiswa.findIndex(s => String(s.nisn) === strNisn);
+                            if(exists !== -1) {
+                                dummySiswa[exists].nama = String(row.Nama); dummySiswa[exists].kelas = String(row.Kelas || '-'); dummySiswa[exists].password = String(row.Password);
+                            } else {
+                                dummySiswa.push({ nisn: strNisn, nama: String(row.Nama), kelas: String(row.Kelas || '-'), password: String(row.Password), currentLevel: 1, totalSkor: 0 });
+                            }
+                            count++;
+                        }
+                    });
+                    if(!IS_PREVIEW && newStudents.length > 0) await fetchGAS({ action: 'bulk_upload', students: newStudents });
+                    updateClassFilter(); renderAdminTable(); document.getElementById('upload-excel').value = ''; alert(`Sukses! ${count} data ditambahkan.`);
+                };
+                reader.readAsBinaryString(file);
+            } catch(e) { alert("Error file Excel."); }
+        }
+
+        function downloadTemplate() {
+            const wb = XLSX.utils.book_new(); 
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ NISN: "0812345678", Nama: "Astro", Kelas: "7A", Password: "123" }]), "DataKadet");
+            XLSX.writeFile(wb, "Template_Kadet_EduBlock.xlsx");
+        }
+
+        async function exportData(type) {
+            const filterClass = document.getElementById('class-filter').value;
+            const dataToExport = filterClass === 'all' ? dummySiswa : dummySiswa.filter(s => s.kelas === filterClass);
+            if(dataToExport.length === 0) return alert("Data kosong.");
+
+            if(type === 'excel') {
+                const wb = XLSX.utils.book_new(); 
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataToExport.map(s => ({ NISN: s.nisn, Nama: s.nama, Kelas: s.kelas, Level_Terakhir: (s.currentLevel > 25 ? 25 : s.currentLevel), Total_Skor: s.totalSkor }))), "Rekap");
+                XLSX.writeFile(wb, `Laporan_EduBlock_${filterClass}.xlsx`);
+            } else {
+                const tbody = document.getElementById('export-table-body'); tbody.innerHTML = '';
+                dataToExport.forEach(s => {
+                    let lvl = s.currentLevel > 25 ? 25 : s.currentLevel;
+                    tbody.innerHTML += `<tr><td class="py-2 px-3 border border-gray-300">${s.nisn}</td><td class="py-2 px-3 border border-gray-300">${s.nama}</td><td class="py-2 px-3 border border-gray-300 text-center">${s.kelas}</td><td class="py-2 px-3 border border-gray-300 text-center">Level ${lvl}</td><td class="py-2 px-3 border border-gray-300 font-bold">${s.totalSkor}</td></tr>`;
+                });
+                document.getElementById('export-class-label').innerText = filterClass; document.getElementById('export-date').innerText = new Date().toLocaleDateString('id-ID');
+                
+                const canvas = await html2canvas(document.getElementById('export-container'), { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                if (type === 'image') {
+                    const link = document.createElement('a'); link.download = `Laporan_${filterClass}.png`; link.href = imgData; link.click();
+                } else if (type === 'pdf') {
+                    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), (canvas.height * pdf.internal.pageSize.getWidth()) / canvas.width);
+                    pdf.save(`Laporan_${filterClass}.pdf`);
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. UI MAP & MODAL
+        // ==========================================
+        function renderLevelMap() {
+            const grid = document.getElementById('level-grid'); grid.innerHTML = '';
+            document.getElementById('student-xp-display').innerHTML = `<i class="fa-solid fa-bolt mr-1"></i>${currentUser.totalSkor} XP`;
+
+            // PERBAIKAN: Banner Notifikasi Master Logika
+            const bannerContainer = document.getElementById('victory-banner-container');
+            if (currentUser.currentLevel > 25) {
+                bannerContainer.innerHTML = `
+                <div class="bg-gradient-to-r from-emerald-900/40 to-blue-900/40 border border-emerald-500/50 rounded-2xl p-4 mb-6 text-center shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                    <h3 class="text-xl font-bold font-sci text-emerald-400 mb-1"><i class="fa-solid fa-trophy mr-2 text-yellow-400"></i> MASTER LOGIKA</h3>
+                    <p class="text-sm text-slate-300">Selamat! Kamu telah berhasil menaklukkan seluruh 25 sektor EduBlock.</p>
+                </div>`;
+            } else {
+                bannerContainer.innerHTML = '';
+            }
+
+            levelConfigs.forEach(lvl => {
+                const isCompleted = currentUser.currentLevel > lvl.level;
+                const isUnlocked = currentUser.currentLevel === lvl.level;
+                const isLocked = currentUser.currentLevel < lvl.level;
+
+                const card = document.createElement('div');
+                card.className = `level-card glass-panel rounded-2xl p-4 flex flex-col items-center justify-center text-center relative overflow-hidden ${isLocked ? 'locked' : 'cursor-pointer'}`;
+                
+                let icon = isCompleted ? '<i class="fa-solid fa-check-circle text-2xl text-emerald-400 mb-2"></i>' :
+                           isUnlocked ? '<i class="fa-solid fa-unlock-keyhole text-2xl text-blue-400 mb-2 animate-pulse"></i>' : '<i class="fa-solid fa-lock text-2xl text-slate-600 mb-2"></i>';
+                let bg = isCompleted ? 'bg-emerald-900/10 border-emerald-500/30' : isUnlocked ? 'bg-blue-900/20 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-slate-900/50 border-slate-800';
+
+                card.classList.add(...bg.split(' '));
+                card.innerHTML = `${icon}<h3 class="font-bold text-xs font-sci text-slate-200">SEKTOR ${lvl.level}</h3>`;
+                if(!isLocked) card.onclick = () => startLevel(lvl.level);
+                grid.appendChild(card);
+            });
+        }
+
+        function showModal(type, title, desc, callback) {
+            const modal = document.getElementById('custom-modal'); const box = document.getElementById('modal-box');
+            document.getElementById('modal-title').innerText = title; document.getElementById('modal-desc').innerText = desc;
+            
+            let btnClass = "w-full font-bold py-3.5 rounded-xl transition text-sm font-sci tracking-widest text-white ";
+            if(type === 'success') { document.getElementById('modal-icon').innerHTML = '<i class="fa-solid fa-check-circle text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]"></i>'; btnClass += "bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]"; }
+            else { document.getElementById('modal-icon').innerHTML = '<i class="fa-solid fa-skull-crossbones text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]"></i>'; btnClass += "bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]"; }
+
+            const btn = document.getElementById('modal-btn'); btn.className = btnClass;
+            modal.classList.remove('hidden-screen'); setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.remove('scale-90'); }, 10);
+            btn.onclick = () => { modal.classList.add('opacity-0'); box.classList.add('scale-90'); setTimeout(() => { modal.classList.add('hidden-screen'); if(callback) callback(); }, 300); };
+        }
+
+        // ==========================================
+        // 4. ENGINE 2D & LOGIKA GAME (DENGAN AUTO SCROLL)
+        // ==========================================
+        function addBlock(type) {
+            const ws = document.getElementById('workspace');
+            document.getElementById('workspace-placeholder').style.display = 'none';
+            
+            let label = "", icon = "", colorClass = "";
+            if(type === 'forward') { label = "Maju 1 Langkah"; icon = "fa-arrow-up"; colorClass = "block-move"; }
+            if(type === 'jump') { label = "Lompat 2 Petak"; icon = "fa-angle-double-up"; colorClass = "block-jump"; }
+            if(type === 'right') { label = "Belok Kanan"; icon = "fa-turn-up rotate-90"; colorClass = "block-turn"; }
+            if(type === 'left') { label = "Belok Kiri"; icon = "fa-turn-up -rotate-90"; colorClass = "block-turn"; }
+            if(type === 'speak') { label = "Kirim Sandi"; icon = "fa-comment-dots"; colorClass = "block-speak"; }
+            if(type === 'grow') { label = "Perbesar"; icon = "fa-expand"; colorClass = "block-transform"; }
+            if(type === 'shrink') { label = "Perkecil"; icon = "fa-compress"; colorClass = "block-shrink"; }
+            if(type === 'color') { label = "Mata Merah"; icon = "fa-eye"; colorClass = "block-color"; }
+            
+            const block = document.createElement('div');
+            block.className = `scratch-block ${colorClass}`;
+            block.innerHTML = `<i class="fa-solid ${icon} w-4 text-center"></i> <span>${label}</span>`;
+            block.dataset.action = type;
+            
+            block.onclick = function() { 
+                if(isAnimating) return;
+                this.remove(); 
+                if(ws.children.length === 0) document.getElementById('workspace-placeholder').style.display = 'block';
+            }; 
+            
+            ws.appendChild(block);
+            const container = document.getElementById('workspace-container'); container.scrollTop = container.scrollHeight;
+        }
+
+        function clearWorkspace() {
+            if(isAnimating) return;
+            document.getElementById('workspace').innerHTML = ''; document.getElementById('workspace-placeholder').style.display = 'block';
+        }
+
+        function backToMap() {
+            isAnimating = false; 
+            document.getElementById('btn-run').innerHTML = '<i class="fa-solid fa-play"></i> EKSEKUSI'; document.getElementById('btn-run').classList.remove('opacity-50', 'cursor-not-allowed');
+            renderLevelMap(); showScreen('student-screen');
+        }
+
+        function startLevel(lvlNumber) {
+            currentLevel = levelConfigs.find(l => l.level === lvlNumber);
+            document.getElementById('game-level-title').innerText = `Sektor ${currentLevel.level}`; document.getElementById('game-case-desc').innerText = currentLevel.desc;
+            lives = 3; document.getElementById('ui-lives').innerText = lives;
+            isAnimating = false; clearWorkspace(); showScreen('game-screen'); resetGameScene();
+        }
+
+        function resetGameScene() {
+            robotX = currentLevel.startX; robotZ = currentLevel.startZ; robotFacing = 0; robotRotDeg = 0;
+            eState = { shrunk: false, grown: false, redEye: false, spoke: false };
+            document.getElementById('eve-red-eye').style.opacity = '0'; document.getElementById('speak-bubble').classList.replace('scale-100', 'scale-0');
+            document.getElementById('battery-target').style.display = 'flex';
+            
+            updateVisuals(false);
+
+            const bat = document.getElementById('battery-target'); bat.style.left = `${(currentLevel.targetX + 2) * C_SIZE}px`; bat.style.top = `${(currentLevel.targetZ + 2) * C_SIZE}px`;
+            const bIcon = document.getElementById('battery-icon');
+            if(currentLevel.reqGrow) {
+                bIcon.className = 'fa-solid fa-battery-full text-3xl text-yellow-400 relative z-10 transition-transform duration-300 transform scale-150';
+                document.getElementById('battery-glow').className = 'absolute inset-0 bg-yellow-500 blur-md opacity-40 rounded-full animate-ping';
+            } else {
+                bIcon.className = 'fa-solid fa-battery-full text-3xl text-emerald-400 relative z-10 transition-transform duration-300';
+                document.getElementById('battery-glow').className = 'absolute inset-0 bg-emerald-500 blur-md opacity-40 rounded-full animate-ping';
+            }
+
+            const obsContainer = document.getElementById('obstacles-container'); obsContainer.innerHTML = '';
+            currentLevel.obstacles.forEach(ob => {
+                const div = document.createElement('div'); div.className = `obstacle-cell`; div.style.left = `${(ob.x + 2) * C_SIZE}px`; div.style.top = `${(ob.z + 2) * C_SIZE}px`; div.id = `obs-${ob.x}-${ob.z}`;
+                if(ob.type === 'rock') div.innerHTML = '<i class="fa-solid fa-square text-[55px] text-slate-800 border border-slate-700 shadow-inner rounded-sm drop-shadow-md"></i>';
+                else if (ob.type === 'pit') div.innerHTML = '<div class="w-11 h-11 bg-black rounded shadow-[inset_0_5px_15px_rgba(0,0,0,1)] border-2 border-slate-900"></div>';
+                else if (ob.type === 'laser') div.innerHTML = '<div class="w-full h-1 bg-red-500 shadow-[0_0_10px_#ef4444] animate-pulse"></div><i class="fa-solid fa-lock text-red-500 absolute text-xs bg-slate-900 rounded-full p-1 border border-red-500/50"></i>';
+                else if (ob.type === 'tunnel') div.innerHTML = '<div class="w-full h-full border-x-4 border-slate-500 bg-slate-800/80 flex justify-center items-center"><i class="fa-solid fa-compress text-slate-400 text-xs"></i></div>';
+                else if (ob.type === 'radiation') div.innerHTML = '<div class="absolute inset-0 bg-red-900/40 border border-red-500/50"></div><i class="fa-solid fa-radiation text-red-500/50 text-2xl animate-spin-slow"></i>';
+                obsContainer.appendChild(div);
+            });
+        }
+
+        function updateVisuals(animate = true) {
+            const eve = document.getElementById('eve-robot');
+            eve.style.transition = animate ? 'all 0.4s ease-out' : 'none'; eve.style.left = `${(robotX + 2) * C_SIZE}px`; eve.style.top = `${(robotZ + 2) * C_SIZE}px`;
+            let scale = 1; if(eState.grown) scale = 1.4; if(eState.shrunk) scale = 0.6;
+            eve.style.transform = `rotate(${robotRotDeg}deg) scale(${scale})`; document.getElementById('eve-red-eye').style.opacity = eState.redEye ? '1' : '0';
+        }
+
+        async function runCode() {
+            if(isAnimating) return;
+            const blocks = Array.from(document.getElementById('workspace').querySelectorAll('.scratch-block'));
+            if(blocks.length === 0) return showModal('error', 'Logika Kosong', 'Susun blok instruksi sebelum eksekusi.');
+
+            isAnimating = true;
+            
+            // Auto Scroll ke Peta Animasi saat dieksekusi
+            const mapContainer = document.getElementById('map-grid');
+            if(mapContainer) mapContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            const btn = document.getElementById('btn-run');
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> MEMPROSES...'; btn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            resetGameScene(); await new Promise(r => setTimeout(r, 400));
+            
+            let failedEarly = false; let failReason = "";
+
+            for(let i=0; i<blocks.length; i++) {
+                if(!isAnimating) break; 
+                blocks.forEach(b => b.style.boxShadow = '0 4px 0 rgba(0,0,0,0.3)'); blocks[i].style.boxShadow = '0 0 15px 3px rgba(255,255,255,0.4)';
+                
+                const action = blocks[i].dataset.action; const moveRes = await executeAction(action);
+                
+                if(moveRes !== 'ok') {
+                    failedEarly = true; failReason = moveRes; document.getElementById('eve-robot').classList.add('anim-shake');
+                    setTimeout(() => document.getElementById('eve-robot').classList.remove('anim-shake'), 500); break;
+                }
+                if(action !== 'speak' && action !== 'color') eState.spoke = false; 
+                await new Promise(r => setTimeout(r, 300));
+            }
+            
+            if(isAnimating) { blocks.forEach(b => b.style.boxShadow = '0 4px 0 rgba(0,0,0,0.3)'); validateEndState(failedEarly, failReason); }
+            isAnimating = false; btn.innerHTML = '<i class="fa-solid fa-play"></i> EKSEKUSI'; btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function checkCell(x, z) {
+            if(x < -2 || x > 2 || z < -2 || z > 2) return 'wall';
+            const obs = currentLevel.obstacles.find(o => o.x === x && o.z === z); return obs ? obs.type : 'empty';
+        }
+
+        function executeAction(action) {
+            return new Promise(resolve => {
+                let steps = 0; if(action === 'forward') steps = 1; if(action === 'jump') steps = 2;
+
+                if(steps > 0) {
+                    let dirX = 0, dirZ = 0;
+                    if(robotFacing === 0) dirZ = -1; else if(robotFacing === 1) dirX = 1; else if(robotFacing === 2) dirZ = 1; else if(robotFacing === 3) dirX = -1;
+
+                    for(let s=1; s<=steps; s++) {
+                        let nextX = robotX + dirX; let nextZ = robotZ + dirZ; let cellType = checkCell(nextX, nextZ);
+
+                        if(cellType === 'wall') return resolve('EVE menabrak batas sektor operasi.');
+                        let isMidAir = (action === 'jump' && s === 1);
+                        
+                        if(!isMidAir) {
+                            if(cellType === 'rock') return resolve('Jalur terhalang rintangan keras.');
+                            if(cellType === 'laser' && !eState.spoke) return resolve('EVE hancur terkena Laser, sandi belum terkirim!');
+                            if(cellType === 'tunnel' && !eState.shrunk) return resolve('EVE tersangkut di lorong sempit.');
+                            if(cellType === 'radiation' && !eState.redEye) return resolve('Sistem EVE korslet akibat radiasi!');
+                            if(cellType === 'pit') return resolve('EVE jatuh ke dalam jurang dasar laut!');
+                        }
+                        robotX = nextX; robotZ = nextZ;
+                    }
+                    updateVisuals(true); setTimeout(() => resolve('ok'), 400); 
+                }
+                else if(action === 'right' || action === 'left') {
+                    robotRotDeg += (action === 'right' ? 90 : -90); robotFacing = (robotFacing + (action === 'right' ? 1 : 3)) % 4; updateVisuals(true); setTimeout(() => resolve('ok'), 400);
+                }
+                else if(action === 'grow' || action === 'shrink') {
+                    eState.grown = (action === 'grow'); eState.shrunk = (action === 'shrink'); updateVisuals(true); setTimeout(() => resolve('ok'), 400);
+                }
+                else if(action === 'color') {
+                    eState.redEye = true; updateVisuals(true); setTimeout(() => resolve('ok'), 300);
+                }
+                else if(action === 'speak') {
+                    eState.spoke = true; const bubble = document.getElementById('speak-bubble'); bubble.style.transform = `scale(1) rotate(${-robotRotDeg}deg)`; 
+                    
+                    let fX = robotX + (robotFacing===1?1 : robotFacing===3?-1 : 0); let fZ = robotZ + (robotFacing===2?1 : robotFacing===0?-1 : 0);
+                    const obsEl = document.getElementById(`obs-${fX}-${fZ}`);
+                    if(obsEl && obsEl.innerHTML.includes('fa-lock')) obsEl.innerHTML = '<div class="w-full h-1 bg-emerald-500 shadow-[0_0_10px_#10b981]"></div><i class="fa-solid fa-unlock text-emerald-500 absolute text-xs bg-slate-900 rounded-full p-1 border border-emerald-500/50"></i>';
+                    
+                    setTimeout(() => { bubble.style.transform = `scale(0) rotate(${-robotRotDeg}deg)`; resolve('ok'); }, 500);
+                }
+            });
+        }
+
+        async function validateEndState(failedEarly, failReason) {
+            if(failedEarly) {
+                lives--; document.getElementById('ui-lives').innerText = lives;
+                if(lives <= 0) showModal('error', "Sistem Kritis", "Daya habis.", () => backToMap()); else showModal('error', "Sekuens Gagal", failReason, () => resetGameScene());
+                return;
+            }
+
+            if(robotX === currentLevel.targetX && robotZ === currentLevel.targetZ) {
+                if(currentLevel.reqGrow && !eState.grown) {
+                    lives--; document.getElementById('ui-lives').innerText = lives;
+                    if(lives <= 0) showModal('error', "Sistem Kritis", "Daya habis.", () => backToMap()); else showModal('error', "Gagal", "Baterai super harus diangkat dalam mode Perbesar!", () => resetGameScene());
+                    return;
+                }
+
+                // PERBAIKAN: Gunakan <= 25 agar saat tamat level 25, currentLevel jadi 26 dan membuka notifikasi Master Logika
+                if(currentUser.currentLevel === currentLevel.level && currentUser.currentLevel <= 25) {
+                    currentUser.currentLevel++; 
+                    currentUser.totalSkor += (100 + (lives * 50));
+                    if (!IS_PREVIEW) fetchGAS({ action: 'update_progress', nisn: currentUser.nisn, currentLevel: currentUser.currentLevel, totalSkor: currentUser.totalSkor });
+                }
+                
+                document.getElementById('battery-target').style.display = 'none';
+
+                // PERBAIKAN: Notifikasi Khusus Saat Tamat
+                if (currentLevel.level === 25 && currentUser.currentLevel > 25) {
+                    showModal('success', "MISI SELESAI!", "Luar biasa! Kamu telah menaklukkan seluruh 25 sektor simulasi EduBlock!", () => backToMap());
+                } else {
+                    showModal('success', "Sektor Diamankan!", "Kerja bagus!", () => backToMap());
+                }
+
+            } else {
+                lives--; document.getElementById('ui-lives').innerText = lives;
+                if(lives <= 0) showModal('error', "Sistem Kritis", "Daya habis.", () => backToMap()); else showModal('error', "Meleset", "Koordinat EVE tidak berada pada lokasi target.", () => resetGameScene());
+            }
+        }
+    </script>
+</body>
+</html>
+```eof
+
+Berikut adalah perubahan yang telah saya terapkan pada kode di atas:
+1. **Posisi Tombol**: Tombol *Eksekusi* dan *Hapus Semua* (ikon tong sampah) telah dipindahkan ke bagian atas, tepat di sebelah teks *Briefing Misi*.
+2. **Variasi Level 16-25**: Saya telah membuang *loop* otomatis dan menggantinya dengan rintangan khusus (seperti Z-Wall, Ruang Cermin, Ujian Tiga Lapis) untuk masing-masing level 16 hingga 25, sehingga membutuhkan logika berpikir yang lebih rumit (harus mengecil, melompat, menyalakan mata merah secara berurutan dalam satu ruang).
+3. **Logika Level 25 Selesai**: Saya sudah memperbaiki batas `currentLevel`. Sekarang ketika siswa berhasil melewati Level 25, statusnya akan dicatat dengan benar sehingga Level 25 akan berubah hijau (centang) seperti level lainnya (tidak terlihat terkunci lagi).
+4. **Notifikasi Kemenangan**: Saat siswa menamatkan Level 25, akan muncul jendela notifikasi sukses khusus bertuliskan **"MISI SELESAI!"**. Setelah mereka kembali ke peta utama, akan muncul sebuah *Banner Kemenangan "MASTER LOGIKA"* berkilau tepat di atas deretan kartu level.
